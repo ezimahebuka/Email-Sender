@@ -10,6 +10,7 @@ import {
   validateSubject,
 } from "@/lib/email-validation";
 import { processRecipients } from "@/lib/process-recipients";
+import { validateEmailContent } from "@/lib/email-content";
 import {
   classifySmtpError,
   SMTP_AUTH_ERROR,
@@ -34,20 +35,6 @@ function isConfigured(): boolean {
   );
 }
 
-function htmlEscape(value: string): string {
-  return value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[character] ?? character,
-  );
-}
-
 export async function POST(request: Request) {
   if (!isConfigured()) {
     return NextResponse.json(
@@ -62,7 +49,7 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const subject = String(form.get("subject") ?? "");
-    const message = String(form.get("message") ?? "");
+    const submittedHtml = String(form.get("messageHtml") ?? form.get("message") ?? "");
     const maximumRecipients = positiveInteger(
       process.env.MAX_RECIPIENTS,
       DEFAULT_MAX_RECIPIENTS,
@@ -81,6 +68,7 @@ export async function POST(request: Request) {
     validateSubject(subject);
     if (/[\r\n]/.test(subject))
       throw new Error("Subject cannot contain line breaks.");
+    const { html, text: message } = validateEmailContent(submittedHtml);
     validateMessage(message);
 
     const recipientsValue = String(form.get("recipients") ?? "");
@@ -130,7 +118,7 @@ export async function POST(request: Request) {
           address: process.env.BREVO_SENDER_EMAIL!,
         }
       : process.env.BREVO_SENDER_EMAIL!;
-    const html = `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.65;color:#202a29;white-space:pre-wrap">${htmlEscape(message)}</div>`;
+    const emailHtml = `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.65;color:#202a29">${html}</div>`;
     const concurrency = positiveInteger(process.env.SEND_CONCURRENCY, 3);
 
     const outcomes = await processRecipients(
@@ -142,7 +130,7 @@ export async function POST(request: Request) {
             to: email,
             subject,
             text: message,
-            html,
+            html: emailHtml,
             attachments,
           });
         } catch (error) {
@@ -193,6 +181,8 @@ export async function POST(request: Request) {
       "is empty",
       "per-file limit",
       "unsupported file type",
+      "Email buttons must use",
+      "Email HTML is too large",
     ].some((part) => message.includes(part));
 
     return NextResponse.json(

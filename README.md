@@ -40,6 +40,10 @@ A small Next.js App Router application for sending one message separately to eac
 
 Enter a subject, recipient addresses separated by commas, semicolons, or new lines, and the message. Duplicate recipient addresses are removed case-insensitively. Add optional attachments and remove them individually as needed. After confirmation, the app sends one email per address, with the same subject, text/HTML message, and attachments; recipients do not appear in one another's messages.
 
+The Email Message field uses Tiptap for rich-text formatting: bold, italic, underline, strikethrough, font sizing, text/highlight colors, lists, alignment, links, undo/redo, and clear formatting. Use **Insert Button** to add an email-compatible clickable link button; select it later to edit its text, URL, and colors, or remove it. Button URLs must use `https://` or `http://`.
+
+The editor submits HTML to the server. Before sending, server-side sanitization removes scripts, event handlers, unsafe protocols, and unsupported styles. The sanitized HTML is sent through Nodemailer as `html`, with a plain-text fallback generated from the same content as `text`. Rich formatting and button colors are restricted to inline styles supported by common email clients.
+
 The server allows up to 500 recipients, 5 files, 10 MB per file, and 20 MB total attachment data by default. Limits and worker/rate controls can be changed in `.env.local` with `MAX_RECIPIENTS`, `MAX_ATTACHMENT_FILES`, `MAX_ATTACHMENT_SIZE_MB`, `MAX_TOTAL_ATTACHMENT_SIZE_MB`, `SEND_CONCURRENCY`, and `SEND_RATE_PER_SECOND`. Allowed file types are PDF, TXT, CSV, PNG, JPG/JPEG, DOC/DOCX, and XLS/XLSX.
 
 ## Checks

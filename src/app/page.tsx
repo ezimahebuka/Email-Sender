@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import EmailEditor from "@/components/email-editor";
 import {
   DEFAULT_MAX_FILE_BYTES,
   DEFAULT_MAX_FILES,
@@ -20,6 +21,7 @@ export default function Home() {
   const [subject, setSubject] = useState("");
   const [recipientText, setRecipientText] = useState("");
   const [message, setMessage] = useState("");
+  const [messageText, setMessageText] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -45,7 +47,7 @@ export default function Home() {
     setResult(null);
     try {
       validateSubject(subject);
-      validateMessage(message);
+      validateMessage(messageText);
       validateRecipients(recipients, DEFAULT_MAX_RECIPIENTS);
       validateAttachmentMetadata(attachments, {
         maxFiles: DEFAULT_MAX_FILES,
@@ -74,7 +76,7 @@ export default function Home() {
       const form = new FormData();
       form.set("subject", subject);
       form.set("recipients", recipients.join("\n"));
-      form.set("message", message);
+      form.set("messageHtml", message);
       attachments.forEach((file) => form.append("attachments", file));
 
       const response = await fetch("/api/email/send", {
@@ -189,16 +191,13 @@ export default function Home() {
             <label htmlFor="message">
               <span className="field-index">03</span>Email Message
             </label>
-            <textarea
-              id="message"
-              suppressHydrationWarning
-              className="message-input"
-              maxLength={100_000}
-              placeholder="Write your message here..."
+            <EmailEditor
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(html, text) => {
+                setMessage(html);
+                setMessageText(text);
+              }}
               disabled={isSending}
-              required
             />
           </div>
 
