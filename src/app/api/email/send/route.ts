@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { SendMailOptions } from "nodemailer";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import {
@@ -12,10 +15,13 @@ import {
 import { processRecipients } from "@/lib/process-recipients";
 import { validateEmailContent } from "@/lib/email-content";
 import {
+  brandingFromEnvironment,
+  renderEmailTemplate,
+} from "@/lib/email-template";
+import {
   classifySmtpError,
-  SMTP_AUTH_ERROR,
+  PUBLIC_SMTP_ERRORS,
   SMTP_DELIVERY_ERROR,
-  SMTP_RATE_ERROR,
 } from "@/lib/smtp-errors";
 
 export const runtime = "nodejs";
@@ -49,7 +55,9 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const subject = String(form.get("subject") ?? "");
-    const submittedHtml = String(form.get("messageHtml") ?? form.get("message") ?? "");
+    const submittedHtml = String(
+      form.get("messageHtml") ?? form.get("message") ?? "",
+    );
     const maximumRecipients = positiveInteger(
       process.env.MAX_RECIPIENTS,
       DEFAULT_MAX_RECIPIENTS,
@@ -102,6 +110,8 @@ export async function POST(request: Request) {
         user: process.env.BREVO_SMTP_USER,
         pass: process.env.BREVO_SMTP_KEY,
       },
+      requireTLS: port === 587,
+      tls: { minVersion: "TLSv1.2" },
       pool: true,
       maxConnections: positiveInteger(process.env.SEND_CONCURRENCY, 3),
       rateDelta: 1000,
@@ -111,31 +121,96 @@ export async function POST(request: Request) {
       socketTimeout: 60_000,
     });
 
-    const senderName = process.env.BREVO_SENDER_NAME?.trim();
-    const from = senderName
-      ? {
-          name: senderName.replace(/[\r\n]/g, " "),
-          address: process.env.BREVO_SENDER_EMAIL!,
-        }
-      : process.env.BREVO_SENDER_EMAIL!;
-    const emailHtml = `<div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.65;color:#202a29">${html}</div>`;
+    const branding = brandingFromEnvironment();
+    const senderName = (branding.brandName ?? "Lotus").replace(/[\r\n]/g, " ");
+    const senderEmail = process.env.BREVO_SENDER_EMAIL!.trim();
+    const configuredReplyTo = process.env.BREVO_REPLY_TO?.trim();
+    const replyToEmail =
+      configuredReplyTo && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuredReplyTo)
+        ? configuredReplyTo
+        : senderEmail;
+    const from = { name: senderName, address: senderEmail };
+    const replyTo = { name: senderName, address: replyToEmail };
+    const emailAttachments: NonNullable<SendMailOptions["attachments"]> = [
+      ...attachments,
+    ];
+    if (!branding.logoUrl) {
+      emailAttachments.push({
+        filename: "lotus-mark.png",
+        content: await readFile(
+          join(process.cwd(), "public", "lotus-mark.png"),
+        ),
+        contentType: "image/png",
+        cid: "lotus-mark",
+      });
+    }
     const concurrency = positiveInteger(process.env.SEND_CONCURRENCY, 3);
 
     const outcomes = await processRecipients(
       recipients,
       async (email) => {
         try {
-          await transporter.sendMail({
+          const renderedEmail = renderEmailTemplate(
+            email,
+            html,
+            message,
+            branding,
+          );
+          const sendInfo = await transporter.sendMail({
             from,
+            replyTo,
             to: email,
             subject,
-            text: message,
-            html: emailHtml,
-            attachments,
+            text: renderedEmail.text,
+            html: renderedEmail.html,
+            attachments: emailAttachments,
           });
+          const responseCode =
+            Number(sendInfo.response.match(/^(\d{3})/)?.[1]) || undefined;
+          if (sendInfo.rejected.length > 0) {
+            const publicError =
+              classifySmtpError({ responseCode }) ?? SMTP_DELIVERY_ERROR;
+            console.warn(
+              "[email-delivery]",
+              JSON.stringify({
+                event: "recipient_rejected",
+                messageId: sendInfo.messageId,
+                responseCode,
+                rejectedCount: sendInfo.rejected.length,
+                category: publicError,
+              }),
+            );
+            throw Object.assign(new Error("Delivery failed."), { publicError });
+          }
+          console.info(
+            "[email-delivery]",
+            JSON.stringify({
+              event: "smtp_accepted",
+              messageId: sendInfo.messageId,
+              responseCode,
+              acceptedCount: sendInfo.accepted.length,
+              attachmentCount: files.length,
+            }),
+          );
         } catch (error) {
+          const suppliedError = (error as { publicError?: unknown })
+            ?.publicError;
+          const publicError =
+            typeof suppliedError === "string" &&
+            PUBLIC_SMTP_ERRORS.includes(
+              suppliedError as (typeof PUBLIC_SMTP_ERRORS)[number],
+            )
+              ? suppliedError
+              : classifySmtpError(error);
+          console.warn(
+            "[email-delivery]",
+            JSON.stringify({
+              event: "send_failed",
+              category: publicError ?? SMTP_DELIVERY_ERROR,
+            }),
+          );
           throw Object.assign(new Error("Delivery failed."), {
-            publicError: classifySmtpError(error),
+            publicError,
           });
         }
       },
@@ -144,19 +219,13 @@ export async function POST(request: Request) {
 
     transporter.close();
     const failed = outcomes.filter((outcome) => !outcome.success);
-    const authFailure = failed.some(
-      (outcome) => outcome.error === SMTP_AUTH_ERROR,
-    );
-    const rateLimited = failed.some(
-      (outcome) => outcome.error === SMTP_RATE_ERROR,
-    );
-    const error = authFailure
-      ? "SMTP authentication failed. Check the Brevo SMTP login and key."
-      : rateLimited
-        ? "Brevo is temporarily rate-limiting delivery. Try again later."
-        : failed.length > 0
-          ? SMTP_DELIVERY_ERROR
-          : undefined;
+    const error = failed.length
+      ? [
+          ...new Set(
+            failed.map((outcome) => outcome.error ?? SMTP_DELIVERY_ERROR),
+          ),
+        ].join(" ")
+      : undefined;
 
     return NextResponse.json({
       sent: outcomes.filter((outcome) => outcome.success).length,

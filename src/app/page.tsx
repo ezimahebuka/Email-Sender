@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import EmailEditor from "@/components/email-editor";
 import {
   DEFAULT_MAX_FILE_BYTES,
@@ -108,15 +109,25 @@ export default function Home() {
   return (
     <main className="page-shell">
       <header className="topbar">
-        <a className="wordmark" href="#top" aria-label="Bulk Email Sender home">
-          <span className="mark" aria-hidden="true">
-            B
-          </span>
-          <span>
-            POSTROOM<span className="wordmark-dot">.</span>
-          </span>
+        <a
+          className="wordmark"
+          href="#top"
+          aria-label="Lotus Bulk Email Sender home"
+        >
+          <Image
+            className="lotus-mark"
+            src="/lotus-mark.svg"
+            width={32}
+            height={32}
+            alt=""
+            priority
+          />
+          <span>Lotus</span>
         </a>
-        <span className="topbar-note">OUTBOUND MESSAGING</span>
+        <span className="topbar-note">
+          GROW <span className="tagline-separator">•</span> BUILD{" "}
+          <span className="tagline-separator">•</span> SUCCEED
+        </span>
       </header>
 
       <section className="workspace" id="top">
@@ -210,6 +221,7 @@ export default function Home() {
               <button
                 className="add-file"
                 type="button"
+                suppressHydrationWarning
                 onClick={() => fileInput.current?.click()}
                 disabled={isSending}
               >
@@ -231,6 +243,7 @@ export default function Home() {
               <button
                 className="drop-hint"
                 type="button"
+                suppressHydrationWarning
                 onClick={() => fileInput.current?.click()}
                 disabled={isSending}
               >
@@ -316,7 +329,7 @@ export default function Home() {
         </form>
 
         <footer className="page-footer">
-          <span>POSTROOM / COMPOSE</span>
+          <span>LOTUS / COMPOSE</span>
           <span>SECURE SMTP DELIVERY</span>
         </footer>
       </section>

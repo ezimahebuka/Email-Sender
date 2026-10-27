@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { emailHtmlToText, sanitizeEmailHtml, validateEmailContent } from "./email-content";
+import {
+  emailHtmlToText,
+  sanitizeEmailHtml,
+  validateEmailContent,
+} from "./email-content";
 
 describe("email HTML processing", () => {
   it("preserves supported formatting and creates a plain-text fallback", () => {
@@ -25,9 +29,11 @@ describe("email HTML processing", () => {
   });
 
   it("rejects email buttons with non-http(s) destinations", () => {
-    expect(() => sanitizeEmailHtml(
-      '<a data-email-button="true" data-button-bg="#236a53" data-button-text="#ffffff" href="javascript:alert(1)">Click</a>',
-    )).toThrow("valid http:// or https:// destination");
+    expect(() =>
+      sanitizeEmailHtml(
+        '<a data-email-button="true" data-button-bg="#236a53" data-button-text="#ffffff" href="javascript:alert(1)">Click</a>',
+      ),
+    ).toThrow("valid http:// or https:// destination");
   });
 
   it("rewrites button markup to an email-compatible styled anchor", () => {
@@ -38,10 +44,12 @@ describe("email HTML processing", () => {
     expect(safe).toContain('href="https://example.com/"');
     expect(safe).toContain("display:inline-block");
     expect(safe).toContain("background-color:#336699");
-    expect(safe).toContain("target=\"_blank\"");
+    expect(safe).toContain('target="_blank"');
   });
 
   it("rejects empty message content", () => {
-    expect(() => validateEmailContent("<p><br></p>")).toThrow("Enter an email message");
+    expect(() => validateEmailContent("<p><br></p>")).toThrow(
+      "Enter an email message",
+    );
   });
 });

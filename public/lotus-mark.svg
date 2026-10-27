@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Loctus flower mark</title>
+  <g fill="none" stroke="#F5B301" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+    <path d="M48 72C28 61 24 43 48 18c24 25 20 43 0 54Z"/>
+    <path d="M44 69C24 68 13 55 12 35c20 2 32 12 36 31"/>
+    <path d="M52 69c20-1 31-14 32-34-20 2-32 12-36 31"/>
+    <path d="M25 73c13 8 33 8 46 0"/>
+  </g>
+</svg>

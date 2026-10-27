@@ -23,31 +23,47 @@ type EmailButtonAttributes = {
 const DEFAULT_BUTTON: EmailButtonAttributes = {
   href: "https://",
   label: "Visit Our Website",
-  backgroundColor: "#236a53",
+  backgroundColor: "#0B1F44",
   textColor: "#ffffff",
 };
 
 function safeHttpUrl(value: string): string | null {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : null;
   } catch {
     return null;
   }
 }
-
 const EmailButton = Node.create({
   name: "emailButton",
   inline: true,
   group: "inline",
   atom: true,
   selectable: true,
+  renderText({ node }) {
+    return String(node.attrs.label ?? "");
+  },
   addAttributes() {
     return {
-      href: { default: "https://", parseHTML: (element) => element.getAttribute("href") },
-      label: { default: "Visit Our Website", parseHTML: (element) => element.textContent },
-      backgroundColor: { default: "#236a53", parseHTML: (element) => element.getAttribute("data-button-bg") },
-      textColor: { default: "#ffffff", parseHTML: (element) => element.getAttribute("data-button-text") },
+      href: {
+        default: "https://",
+        parseHTML: (element) => element.getAttribute("href"),
+      },
+      label: {
+        default: "Visit Our Website",
+        parseHTML: (element) => element.textContent,
+      },
+      backgroundColor: {
+        default: "#0B1F44",
+        parseHTML: (element) => element.getAttribute("data-button-bg"),
+      },
+      textColor: {
+        default: "#ffffff",
+        parseHTML: (element) => element.getAttribute("data-button-text"),
+      },
     };
   },
   parseHTML() {
@@ -55,8 +71,13 @@ const EmailButton = Node.create({
   },
   renderHTML({ HTMLAttributes }) {
     const href = safeHttpUrl(String(HTMLAttributes.href ?? "")) ?? "https://";
-    const label = String(HTMLAttributes.label ?? DEFAULT_BUTTON.label).slice(0, 100);
-    const backgroundColor = /^#[\da-f]{6}$/i.test(HTMLAttributes.backgroundColor)
+    const label = String(HTMLAttributes.label ?? DEFAULT_BUTTON.label).slice(
+      0,
+      100,
+    );
+    const backgroundColor = /^#[\da-f]{6}$/i.test(
+      HTMLAttributes.backgroundColor,
+    )
       ? HTMLAttributes.backgroundColor
       : DEFAULT_BUTTON.backgroundColor;
     const textColor = /^#[\da-f]{6}$/i.test(HTMLAttributes.textColor)
@@ -82,17 +103,21 @@ const EmailButton = Node.create({
 const FontSize = Extension.create({
   name: "fontSize",
   addGlobalAttributes() {
-    return [{
-      types: ["textStyle"],
-      attributes: {
-        fontSize: {
-          default: null,
-          parseHTML: (element: HTMLElement) => element.style.fontSize || null,
-          renderHTML: (attributes: { fontSize?: string | null }) =>
-            attributes.fontSize ? { style: `font-size:${attributes.fontSize}` } : {},
+    return [
+      {
+        types: ["textStyle"],
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element: HTMLElement) => element.style.fontSize || null,
+            renderHTML: (attributes: { fontSize?: string | null }) =>
+              attributes.fontSize
+                ? { style: `font-size:${attributes.fontSize}` }
+                : {},
+          },
         },
       },
-    }];
+    ];
   },
 });
 
@@ -102,11 +127,22 @@ type EmailEditorProps = {
   disabled?: boolean;
 };
 
-type ButtonDialog = EmailButtonAttributes & { editing: boolean };
+type ButtonDialog = EmailButtonAttributes & {
+  kind: "button";
+  editing: boolean;
+};
+type LinkDialog = { kind: "link"; href: string };
+type EditorDialog = ButtonDialog | LinkDialog;
 
-export default function EmailEditor({ value, onChange, disabled = false }: EmailEditorProps) {
-  const [dialog, setDialog] = useState<ButtonDialog | null>(null);
+export default function EmailEditor({
+  value,
+  onChange,
+  disabled = false,
+}: EmailEditorProps) {
+  const [dialog, setDialog] = useState<EditorDialog | null>(null);
   const [dialogError, setDialogError] = useState("");
+  const [selectedButton, setSelectedButton] =
+    useState<EmailButtonAttributes | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     editable: !disabled,
@@ -121,14 +157,25 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
         openOnClick: false,
         autolink: true,
         HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" },
-        isAllowedUri: (url) => Boolean(safeHttpUrl(url)) || url.startsWith("mailto:"),
+        isAllowedUri: (url) =>
+          Boolean(safeHttpUrl(url)) || url.startsWith("mailto:"),
       }),
       Placeholder.configure({ placeholder: "Write your message here..." }),
       FontSize,
       EmailButton,
     ],
     content: value || "<p></p>",
-    onUpdate: ({ editor: current }) => onChange(current.getHTML(), current.getText()),
+    onUpdate: ({ editor: current }) =>
+      onChange(current.getHTML(), current.getText()),
+    onSelectionUpdate: ({ editor: current }) => {
+      const selection = current.state.selection;
+      setSelectedButton(
+        selection instanceof NodeSelection &&
+          selection.node.type.name === "emailButton"
+          ? (selection.node.attrs as EmailButtonAttributes)
+          : null,
+      );
+    },
     editorProps: {
       attributes: {
         class: "message-input rich-editor-content",
@@ -150,39 +197,56 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
   }, [disabled, editor]);
 
   useEffect(() => {
-    if (editor && value && value !== editor.getHTML()) editor.commands.setContent(value, { emitUpdate: false });
+    if (editor && value && value !== editor.getHTML())
+      editor.commands.setContent(value, { emitUpdate: false });
   }, [editor, value]);
 
-  if (!editor) return <div className="rich-editor-loading" aria-label="Loading message editor" />;
+  if (!editor)
+    return (
+      <div
+        className="rich-editor-loading"
+        aria-label="Loading message editor"
+      />
+    );
   const activeEditor = editor;
 
   function setLink() {
-    const existing = activeEditor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Enter a web address (https:// or http://)", existing ?? "https://");
-    if (href === null) return;
-    if (!safeHttpUrl(href) && !href.startsWith("mailto:")) {
+    const existing = activeEditor.getAttributes("link").href as
+      | string
+      | undefined;
+    setDialog({ kind: "link", href: existing ?? "https://" });
+    setDialogError("");
+  }
+
+  function saveLink() {
+    if (dialog?.kind !== "link") return;
+    if (!safeHttpUrl(dialog.href) && !dialog.href.startsWith("mailto:")) {
       setDialogError("Use a valid http:// or https:// link.");
       return;
     }
-    setDialogError("");
-    activeEditor.chain().focus().setLink({ href }).run();
+    activeEditor.chain().focus().setLink({ href: dialog.href.trim() }).run();
+    setDialog(null);
   }
 
   function editButton() {
     const selection = activeEditor.state.selection;
-    const node = selection instanceof NodeSelection
-      ? selection.node as typeof selection.node & { attrs: EmailButtonAttributes }
-      : undefined;
+    const node =
+      selection instanceof NodeSelection
+        ? (selection.node as typeof selection.node & {
+            attrs: EmailButtonAttributes;
+          })
+        : undefined;
     const isButton = node?.type.name === "emailButton";
     setDialog({
-      ...(isButton ? node.attrs : DEFAULT_BUTTON),
-      editing: Boolean(isButton),
+      ...(selectedButton ?? (isButton ? node.attrs : DEFAULT_BUTTON)),
+      kind: "button",
+      editing: Boolean(selectedButton || isButton),
     });
     setDialogError("");
   }
 
   function saveButton() {
-    if (!dialog) return;
+    if (!dialog || dialog.kind !== "button") return;
     const href = safeHttpUrl(dialog.href);
     if (!href) {
       setDialogError("Enter a valid http:// or https:// destination.");
@@ -199,14 +263,22 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
       textColor: dialog.textColor,
     };
     if (dialog.editing) {
-      activeEditor.chain().focus().updateAttributes("emailButton", attributes).run();
+      activeEditor
+        .chain()
+        .focus()
+        .updateAttributes("emailButton", attributes)
+        .run();
     } else {
-      activeEditor.chain().focus().insertContent({ type: "emailButton", attrs: attributes }).run();
+      activeEditor
+        .chain()
+        .focus()
+        .insertContent({ type: "emailButton", attrs: attributes })
+        .run();
     }
     setDialog(null);
   }
 
-  const activeButton = editor.isActive("emailButton");
+  const activeButton = Boolean(selectedButton);
   const toolbarButton = (
     label: string,
     action: () => void,
@@ -230,11 +302,31 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
 
   return (
     <div className="rich-editor" aria-label="Email message editor">
-      <div className="editor-toolbar" role="toolbar" aria-label="Message formatting">
-        {toolbarButton("B", () => editor.chain().focus().toggleBold().run(), editor.isActive("bold"))}
-        {toolbarButton("I", () => editor.chain().focus().toggleItalic().run(), editor.isActive("italic"))}
-        {toolbarButton("U", () => editor.chain().focus().toggleUnderline().run(), editor.isActive("underline"))}
-        {toolbarButton("S", () => editor.chain().focus().toggleStrike().run(), editor.isActive("strike"))}
+      <div
+        className="editor-toolbar"
+        role="toolbar"
+        aria-label="Message formatting"
+      >
+        {toolbarButton(
+          "B",
+          () => editor.chain().focus().toggleBold().run(),
+          editor.isActive("bold"),
+        )}
+        {toolbarButton(
+          "I",
+          () => editor.chain().focus().toggleItalic().run(),
+          editor.isActive("italic"),
+        )}
+        {toolbarButton(
+          "U",
+          () => editor.chain().focus().toggleUnderline().run(),
+          editor.isActive("underline"),
+        )}
+        {toolbarButton(
+          "S",
+          () => editor.chain().focus().toggleStrike().run(),
+          editor.isActive("strike"),
+        )}
         <span className="toolbar-divider" />
         <label className="editor-select-label" title="Font size">
           <span className="visually-hidden">Font size</span>
@@ -245,9 +337,14 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
             onChange={(event) => {
               const chain = editor.chain().focus();
               if (event.target.value) {
-                chain.setMark("textStyle", { fontSize: event.target.value }).run();
+                chain
+                  .setMark("textStyle", { fontSize: event.target.value })
+                  .run();
               } else {
-                chain.setMark("textStyle", { fontSize: null }).removeEmptyTextStyle().run();
+                chain
+                  .setMark("textStyle", { fontSize: null })
+                  .removeEmptyTextStyle()
+                  .run();
               }
             }}
           >
@@ -261,48 +358,193 @@ export default function EmailEditor({ value, onChange, disabled = false }: Email
           </select>
         </label>
         <label className="editor-color-tool" title="Text color">
-          <span>A</span><input aria-label="Text color" type="color" defaultValue="#202a29" disabled={disabled} onChange={(event) => editor.chain().focus().setColor(event.target.value).run()} />
+          <span>A</span>
+          <input
+            aria-label="Text color"
+            type="color"
+            defaultValue="#202a29"
+            disabled={disabled}
+            onChange={(event) =>
+              editor.chain().focus().setColor(event.target.value).run()
+            }
+          />
         </label>
-        <label className="editor-color-tool highlight-tool" title="Highlight color">
-          <span>▰</span><input aria-label="Highlight color" type="color" defaultValue="#fff09b" disabled={disabled} onChange={(event) => editor.chain().focus().toggleHighlight({ color: event.target.value }).run()} />
+        <label
+          className="editor-color-tool highlight-tool"
+          title="Highlight color"
+        >
+          <span>▰</span>
+          <input
+            aria-label="Highlight color"
+            type="color"
+            defaultValue="#fff09b"
+            disabled={disabled}
+            onChange={(event) =>
+              editor
+                .chain()
+                .focus()
+                .toggleHighlight({ color: event.target.value })
+                .run()
+            }
+          />
         </label>
         <span className="toolbar-divider" />
-        {toolbarButton("• List", () => editor.chain().focus().toggleBulletList().run(), editor.isActive("bulletList"))}
-        {toolbarButton("1. List", () => editor.chain().focus().toggleOrderedList().run(), editor.isActive("orderedList"))}
-        {toolbarButton("Left", () => editor.chain().focus().setTextAlign("left").run(), editor.isActive({ textAlign: "left" }))}
-        {toolbarButton("Center", () => editor.chain().focus().setTextAlign("center").run(), editor.isActive({ textAlign: "center" }))}
-        {toolbarButton("Right", () => editor.chain().focus().setTextAlign("right").run(), editor.isActive({ textAlign: "right" }))}
+        {toolbarButton(
+          "• List",
+          () => editor.chain().focus().toggleBulletList().run(),
+          editor.isActive("bulletList"),
+        )}
+        {toolbarButton(
+          "1. List",
+          () => editor.chain().focus().toggleOrderedList().run(),
+          editor.isActive("orderedList"),
+        )}
+        {toolbarButton(
+          "Left",
+          () => editor.chain().focus().setTextAlign("left").run(),
+          editor.isActive({ textAlign: "left" }),
+        )}
+        {toolbarButton(
+          "Center",
+          () => editor.chain().focus().setTextAlign("center").run(),
+          editor.isActive({ textAlign: "center" }),
+        )}
+        {toolbarButton(
+          "Right",
+          () => editor.chain().focus().setTextAlign("right").run(),
+          editor.isActive({ textAlign: "right" }),
+        )}
         <span className="toolbar-divider" />
         {toolbarButton("Link", setLink, editor.isActive("link"))}
+        {editor.isActive("link") &&
+          toolbarButton("Remove Link", () =>
+            editor.chain().focus().unsetLink().run(),
+          )}
         {toolbarButton("Insert Button", editButton, activeButton)}
-        {activeButton && toolbarButton("Remove Button", () => editor.chain().focus().deleteSelection().run())}
-        {toolbarButton("Undo", () => editor.chain().focus().undo().run(), false, !editor.can().undo())}
-        {toolbarButton("Redo", () => editor.chain().focus().redo().run(), false, !editor.can().redo())}
-        {toolbarButton("Clear", () => editor.chain().focus().clearNodes().unsetAllMarks().run())}
+        {activeButton &&
+          toolbarButton("Remove Button", () =>
+            editor.chain().focus().deleteSelection().run(),
+          )}
+        {toolbarButton(
+          "Undo",
+          () => editor.chain().focus().undo().run(),
+          false,
+          !editor.can().undo(),
+        )}
+        {toolbarButton(
+          "Redo",
+          () => editor.chain().focus().redo().run(),
+          false,
+          !editor.can().redo(),
+        )}
+        {toolbarButton("Clear", () =>
+          editor.chain().focus().clearNodes().unsetAllMarks().run(),
+        )}
       </div>
       <EditorContent editor={editor} />
 
       {dialog && (
-        <div className="modal-backdrop editor-modal-backdrop" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setDialog(null);
-        }}>
-          <section className="confirm-dialog button-dialog" role="dialog" aria-modal="true" aria-labelledby="button-dialog-title">
-            <p className="eyebrow"><span className="status-dot" /> EMAIL BUTTON</p>
-            <h2 id="button-dialog-title">{dialog.editing ? "Edit button" : "Insert button"}</h2>
-            <label className="dialog-field">Button text
-              <input autoFocus maxLength={100} value={dialog.label} onChange={(event) => setDialog({ ...dialog, label: event.target.value })} />
+        <div
+          className="modal-backdrop editor-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDialog(null);
+          }}
+        >
+          <section
+            className="confirm-dialog button-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="button-dialog-title"
+          >
+            <p className="eyebrow">
+              <span className="status-dot" />{" "}
+              {dialog.kind === "link" ? "EMAIL LINK" : "EMAIL BUTTON"}
+            </p>
+            <h2 id="button-dialog-title">
+              {dialog.kind === "link"
+                ? "Insert link"
+                : dialog.editing
+                  ? "Edit button"
+                  : "Insert button"}
+            </h2>
+            {dialog.kind === "button" && (
+              <label className="dialog-field">
+                Button text
+                <input
+                  autoFocus
+                  maxLength={100}
+                  value={dialog.label}
+                  onChange={(event) =>
+                    setDialog({ ...dialog, label: event.target.value })
+                  }
+                />
+              </label>
+            )}
+            <label className="dialog-field">
+              {dialog.kind === "link" ? "Web address" : "Destination URL"}
+              <input
+                type="url"
+                placeholder="https://example.com"
+                value={dialog.href}
+                onChange={(event) =>
+                  setDialog({ ...dialog, href: event.target.value })
+                }
+              />
             </label>
-            <label className="dialog-field">Destination URL
-              <input type="url" placeholder="https://example.com" value={dialog.href} onChange={(event) => setDialog({ ...dialog, href: event.target.value })} />
-            </label>
-            <div className="button-color-row">
-              <label className="dialog-field">Background color<input aria-label="Button background color" type="color" value={dialog.backgroundColor} onChange={(event) => setDialog({ ...dialog, backgroundColor: event.target.value })} /></label>
-              <label className="dialog-field">Text color<input aria-label="Button text color" type="color" value={dialog.textColor} onChange={(event) => setDialog({ ...dialog, textColor: event.target.value })} /></label>
-            </div>
-            {dialogError && <p className="notice error-notice" role="alert">{dialogError}</p>}
+            {dialog.kind === "button" && (
+              <div className="button-color-row">
+                <label className="dialog-field">
+                  Background color
+                  <input
+                    aria-label="Button background color"
+                    type="color"
+                    value={dialog.backgroundColor}
+                    onChange={(event) =>
+                      setDialog({
+                        ...dialog,
+                        backgroundColor: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="dialog-field">
+                  Text color
+                  <input
+                    aria-label="Button text color"
+                    type="color"
+                    value={dialog.textColor}
+                    onChange={(event) =>
+                      setDialog({ ...dialog, textColor: event.target.value })
+                    }
+                  />
+                </label>
+              </div>
+            )}
+            {dialogError && (
+              <p className="notice error-notice" role="alert">
+                {dialogError}
+              </p>
+            )}
             <div className="dialog-actions">
-              <button type="button" className="cancel-button" onClick={() => setDialog(null)}>Cancel</button>
-              <button type="button" className="send-button" onClick={saveButton}>{dialog.editing ? "Save button" : "Insert button"}</button>
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() => setDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="send-button"
+                onClick={dialog.kind === "link" ? saveLink : saveButton}
+              >
+                {dialog.kind === "link"
+                  ? "Insert link"
+                  : dialog.editing
+                    ? "Save button"
+                    : "Insert button"}
+              </button>
             </div>
           </section>
         </div>

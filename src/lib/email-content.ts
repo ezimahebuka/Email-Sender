@@ -1,18 +1,46 @@
 import sanitizeHtml from "sanitize-html";
 import { convert } from "html-to-text";
 
-const EMAIL_BUTTON_ERROR = "Email buttons must use a valid http:// or https:// destination URL.";
+const EMAIL_BUTTON_ERROR =
+  "Email buttons must use a valid http:// or https:// destination URL.";
 
 export function sanitizeEmailHtml(input: string): string {
   if (input.length > 200_000) throw new Error("Email HTML is too large.");
 
   return sanitizeHtml(input, {
     allowedTags: [
-      "a", "b", "blockquote", "br", "div", "em", "h1", "h2", "h3", "hr", "i", "li",
-      "ol", "p", "s", "span", "strike", "strong", "u", "ul",
+      "a",
+      "b",
+      "blockquote",
+      "br",
+      "div",
+      "em",
+      "h1",
+      "h2",
+      "h3",
+      "hr",
+      "i",
+      "li",
+      "ol",
+      "p",
+      "s",
+      "span",
+      "strike",
+      "strong",
+      "u",
+      "ul",
     ],
     allowedAttributes: {
-      a: ["href", "name", "target", "rel", "style", "data-email-button", "data-button-bg", "data-button-text"],
+      a: [
+        "href",
+        "name",
+        "target",
+        "rel",
+        "style",
+        "data-email-button",
+        "data-button-bg",
+        "data-button-text",
+      ],
       div: ["style"],
       h1: ["style"],
       h2: ["style"],
@@ -51,7 +79,9 @@ export function sanitizeEmailHtml(input: string): string {
 
           const background = attributes["data-button-bg"];
           const text = attributes["data-button-text"];
-          const safeBackground = /^#[\da-f]{6}$/i.test(background ?? "") ? background : "#236a53";
+          const safeBackground = /^#[\da-f]{6}$/i.test(background ?? "")
+            ? background
+            : "#0B1F44";
           const safeText = /^#[\da-f]{6}$/i.test(text ?? "") ? text : "#ffffff";
           return {
             tagName: "a",
@@ -76,16 +106,18 @@ export function sanitizeEmailHtml(input: string): string {
 export function emailHtmlToText(safeHtml: string): string {
   return convert(safeHtml, {
     wordwrap: false,
-    selectors: [
-      { selector: "a", options: { hideLinkHrefIfSameAsText: true } },
-    ],
+    selectors: [{ selector: "a", options: { hideLinkHrefIfSameAsText: true } }],
   }).trim();
 }
 
-export function validateEmailContent(input: string): { html: string; text: string } {
+export function validateEmailContent(input: string): {
+  html: string;
+  text: string;
+} {
   const html = sanitizeEmailHtml(input);
   const text = emailHtmlToText(html);
   if (!text.trim()) throw new Error("Enter an email message.");
-  if (text.length > 100_000) throw new Error("Message must be 100,000 characters or fewer.");
+  if (text.length > 100_000)
+    throw new Error("Message must be 100,000 characters or fewer.");
   return { html, text };
 }

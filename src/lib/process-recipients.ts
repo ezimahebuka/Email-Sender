@@ -1,4 +1,4 @@
-import { SMTP_AUTH_ERROR, SMTP_RATE_ERROR } from "./smtp-errors";
+import { PUBLIC_SMTP_ERRORS } from "./smtp-errors";
 
 export type RecipientOutcome = {
   email: string;
@@ -28,13 +28,12 @@ export async function processRecipients(
           outcomes[index] = { email, success: true };
         } catch (error) {
           const publicError = (error as { publicError?: unknown })?.publicError;
-          const allowedErrors = [SMTP_AUTH_ERROR, SMTP_RATE_ERROR];
           outcomes[index] = {
             email,
             success: false,
             error:
               typeof publicError === "string" &&
-              allowedErrors.includes(publicError)
+              PUBLIC_SMTP_ERRORS.includes(publicError)
                 ? publicError
                 : "Delivery failed.",
           };
