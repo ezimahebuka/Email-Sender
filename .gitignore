@@ -6,3 +6,4 @@ build/
 !.env.example
 npm-debug.log*
 .DS_Store
+!.env.local
