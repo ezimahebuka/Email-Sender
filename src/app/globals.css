@@ -159,7 +159,7 @@ h1 {
   color: #89958e;
   font: 400 9px var(--mono);
 }
-.field input,
+.field input:not(.visually-hidden),
 .field textarea {
   display: block;
   width: 100%;
