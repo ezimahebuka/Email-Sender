@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     });
 
     const branding = brandingFromEnvironment();
-    const senderName = (branding.brandName ?? "Lotus").replace(/[\r\n]/g, " ");
+    const senderName = (branding.brandName ?? "Loctus").replace(/[\r\n]/g, " ");
     const senderEmail = process.env.BREVO_SENDER_EMAIL!.trim();
     const configuredReplyTo = process.env.BREVO_REPLY_TO?.trim();
     const replyToEmail =
@@ -136,12 +136,12 @@ export async function POST(request: Request) {
     ];
     if (!branding.logoUrl) {
       emailAttachments.push({
-        filename: "lotus-mark.png",
+        filename: "Loctus-mark.png",
         content: await readFile(
-          join(process.cwd(), "public", "lotus-mark.png"),
+          join(process.cwd(), "public", "Loctus-mark.png"),
         ),
         contentType: "image/png",
-        cid: "lotus-mark",
+        cid: "Loctus-mark",
       });
     }
     const concurrency = positiveInteger(process.env.SEND_CONCURRENCY, 3);

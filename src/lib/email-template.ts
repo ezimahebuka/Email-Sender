@@ -12,7 +12,7 @@ export type EmailBranding = {
 
 export type RenderedEmail = { html: string; text: string };
 
-const DEFAULT_BRAND = "Lotus";
+const DEFAULT_BRAND = "Loctus";
 const DEFAULT_PRIMARY = "#0B1F44";
 const DEFAULT_ACCENT = "#F5B301";
 
@@ -107,7 +107,7 @@ export function renderEmailTemplate(
   const brandName = cleanText(branding.brandName) ?? DEFAULT_BRAND;
   const primaryColor = configuredColor(branding.primaryColor, DEFAULT_PRIMARY);
   const accentColor = configuredColor(branding.accentColor, DEFAULT_ACCENT);
-  const logoUrl = safeWebUrl(branding.logoUrl, true) ?? "cid:lotus-mark";
+  const logoUrl = safeWebUrl(branding.logoUrl, true) ?? "cid:Loctus-mark";
   const websiteUrl = safeWebUrl(branding.websiteUrl, true);
   const contactEmail = cleanText(branding.contactEmail);
   const contactPhone = cleanText(branding.contactPhone);

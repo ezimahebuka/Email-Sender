@@ -112,17 +112,17 @@ export default function Home() {
         <a
           className="wordmark"
           href="#top"
-          aria-label="Lotus Bulk Email Sender home"
+          aria-label="Loctus Bulk Email Sender home"
         >
           <Image
-            className="lotus-mark"
-            src="/lotus-mark.svg"
+            className="Loctus-mark"
+            src="/Loctus-mark.svg"
             width={32}
             height={32}
             alt=""
             priority
           />
-          <span>Lotus</span>
+          <span>Loctus</span>
         </a>
         <span className="topbar-note">
           GROW <span className="tagline-separator">•</span> BUILD{" "}
@@ -329,7 +329,7 @@ export default function Home() {
         </form>
 
         <footer className="page-footer">
-          <span>LOTUS / COMPOSE</span>
+          <span>Loctus / COMPOSE</span>
           <span>SECURE SMTP DELIVERY</span>
         </footer>
       </section>

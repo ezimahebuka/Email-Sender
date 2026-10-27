@@ -52,15 +52,15 @@ describe("renderEmailTemplate", () => {
     expect(ebuka.text).not.toContain("@gmail.com");
   });
 
-  it("uses a neutral greeting and a compact white Lotus layout without invented contacts", () => {
+  it("uses a neutral greeting and a compact white Loctus layout without invented contacts", () => {
     const rendered = renderEmailTemplate(
       "12345@example.com",
       "<p>Hello body</p>",
       "Hello body",
     );
     expect(rendered.html).toContain("Hello,");
-    expect(rendered.html).toContain("Lotus");
-    expect(rendered.html).toContain('src="cid:lotus-mark"');
+    expect(rendered.html).toContain("Loctus");
+    expect(rendered.html).toContain('src="cid:Loctus-mark"');
     expect(rendered.html).toContain("border-bottom:1px solid #F5B301");
     expect(rendered.html).toContain("border-top:1px solid #e4e8ee");
     expect(rendered.html).toContain("Regards,");
@@ -68,10 +68,10 @@ describe("renderEmailTemplate", () => {
     expect(rendered.html).not.toContain("Company");
     expect(rendered.html).not.toContain("https://example.com");
     expect(rendered.text).toContain("Hello,\n\nHello body");
-    expect(rendered.text).toContain("Regards,\nLotus");
+    expect(rendered.text).toContain("Regards,\nLoctus");
   });
 
-  it("keeps Lotus as the default brand even when the SMTP sender label differs", () => {
+  it("keeps Loctus as the default brand even when the SMTP sender label differs", () => {
     const branding = brandingFromEnvironment({
       BREVO_SENDER_NAME: "Different Sender",
     });
@@ -82,8 +82,8 @@ describe("renderEmailTemplate", () => {
       branding,
     );
 
-    expect(branding.brandName).toBe("Lotus");
-    expect(rendered.html).toContain("Lotus");
+    expect(branding.brandName).toBe("Loctus");
+    expect(rendered.html).toContain("Loctus");
     expect(rendered.html).not.toContain("Different Sender");
   });
 
