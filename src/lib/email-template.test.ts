@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   brandingFromEnvironment,
   extractRecipientName,
+  findBrandLogoAsset,
   renderEmailTemplate,
 } from "./email-template";
 import { validateEmailContent } from "./email-content";
@@ -69,6 +70,11 @@ describe("renderEmailTemplate", () => {
     expect(rendered.html).not.toContain("https://example.com");
     expect(rendered.text).toContain("Hello,\n\nHello body");
     expect(rendered.text).toContain("Regards,\nLoctus");
+  });
+
+  it("finds the actual brand asset in the public folder even when the name casing differs", () => {
+    const logoPath = findBrandLogoAsset();
+    expect(logoPath).toMatch(/lotus-mark\.png$/i);
   });
 
   it("keeps Loctus as the default brand even when the SMTP sender label differs", () => {

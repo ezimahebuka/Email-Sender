@@ -16,6 +16,7 @@ import { processRecipients } from "@/lib/process-recipients";
 import { validateEmailContent } from "@/lib/email-content";
 import {
   brandingFromEnvironment,
+  findBrandLogoAsset,
   renderEmailTemplate,
 } from "@/lib/email-template";
 import {
@@ -135,14 +136,17 @@ export async function POST(request: Request) {
       ...attachments,
     ];
     if (!branding.logoUrl) {
-      emailAttachments.push({
-        filename: "Loctus-mark.png",
-        content: await readFile(
-          join(process.cwd(), "public", "Loctus-mark.png"),
-        ),
-        contentType: "image/png",
-        cid: "Loctus-mark",
-      });
+      const brandLogoAsset = findBrandLogoAsset();
+      if (brandLogoAsset) {
+        emailAttachments.push({
+          filename: brandLogoAsset.split(/[/\\]/).pop() ?? "lotus-mark.png",
+          content: await readFile(brandLogoAsset),
+          contentType: brandLogoAsset.toLowerCase().endsWith(".svg")
+            ? "image/svg+xml"
+            : "image/png",
+          cid: "Loctus-mark",
+        });
+      }
     }
     const concurrency = positiveInteger(process.env.SEND_CONCURRENCY, 3);
 

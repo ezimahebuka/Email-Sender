@@ -1,3 +1,6 @@
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
 export type EmailBranding = {
   brandName?: string;
   tagline?: string;
@@ -73,6 +76,36 @@ function cleanText(value: string | undefined): string | undefined {
 
 function configuredColor(value: string | undefined, fallback: string): string {
   return value && /^#[\da-f]{6}$/i.test(value.trim()) ? value.trim() : fallback;
+}
+
+export function findBrandLogoAsset(
+  baseDir = process.cwd(),
+): string | undefined {
+  const publicDir = join(baseDir, "public");
+  const exactCandidates = [
+    "Loctus-mark.png",
+    "lotus-mark.png",
+    "Logo.png",
+    "Loctus-mark.svg",
+    "lotus-mark.svg",
+    "logo.png",
+  ];
+
+  for (const candidate of exactCandidates) {
+    const target = join(publicDir, candidate);
+    if (existsSync(target)) return target;
+  }
+
+  if (!existsSync(publicDir)) return undefined;
+
+  const entries = readdirSync(publicDir);
+  const match = entries.find(
+    (entry) =>
+      /^(?:loctus|lotus)-?mark\.(?:png|svg)$/i.test(entry) ||
+      /^logo\.png$/i.test(entry),
+  );
+
+  return match ? join(publicDir, match) : undefined;
 }
 
 export function brandingFromEnvironment(

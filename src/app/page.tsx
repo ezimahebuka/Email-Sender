@@ -116,7 +116,7 @@ export default function Home() {
         >
           <Image
             className="Loctus-mark"
-            src="/Loctus-mark.svg"
+            src="/lotus-mark.svg"
             width={32}
             height={32}
             alt=""
